@@ -1,0 +1,1316 @@
+
+
+# Import Library
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import plotly.express as px
+import seaborn as sns
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import scipy.stats as stats
+from scipy.stats import kstest
+from scipy.stats import shapiro
+from sklearn.cluster import AgglomerativeClustering
+import re
+
+"""# Load Data"""
+
+from google.colab import drive
+drive.mount('/content/gdrive')
+
+"""source data: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce/data
+
+## Dataset Customers
+"""
+
+customers = pd.read_csv('/content/gdrive/MyDrive/MSIB #7/CAPSTONE PROJECT/DATA SET/olist_customers_dataset.csv')
+customers.head(20)
+
+"""## Dataset Geolocation"""
+
+geolocation = pd.read_csv('/content/gdrive/MyDrive/MSIB #7/CAPSTONE PROJECT/DATA SET/olist_geolocation_dataset.csv')
+geolocation.head(20)
+
+"""## Dataset Order_items"""
+
+order_items = pd.read_csv('/content/gdrive/MyDrive/MSIB #7/CAPSTONE PROJECT/DATA SET/olist_order_items_dataset.csv')
+order_items.head(20)
+
+"""## Dataset Order_payment"""
+
+order_payment = pd.read_csv('/content/gdrive/MyDrive/MSIB #7/CAPSTONE PROJECT/DATA SET/olist_order_payments_dataset.csv')
+order_payment.head(20)
+
+"""## Dataset Order_reviews"""
+
+order_reviews = pd.read_csv('/content/gdrive/MyDrive/MSIB #7/CAPSTONE PROJECT/DATA SET/olist_order_reviews_dataset.csv')
+order_reviews.head(20)
+
+"""## Dataset orders"""
+
+orders = pd.read_csv('/content/gdrive/MyDrive/MSIB #7/CAPSTONE PROJECT/DATA SET/olist_orders_dataset.csv')
+orders.head(20)
+
+"""## Dataset Products"""
+
+products = pd.read_csv('/content/gdrive/MyDrive/MSIB #7/CAPSTONE PROJECT/DATA SET/olist_products_dataset.csv')
+products.head(20)
+
+"""## Dataset Sellers"""
+
+sellers = pd.read_csv('/content/gdrive/MyDrive/MSIB #7/CAPSTONE PROJECT/DATA SET/olist_sellers_dataset.csv')
+sellers.head(20)
+
+"""## Dataset Product_category_name"""
+
+product_category_name = pd.read_csv('/content/gdrive/MyDrive/MSIB #7/CAPSTONE PROJECT/DATA SET/product_category_name_translation.csv')
+product_category_name.head(20)
+
+"""# Menduplikat DataFrame & Data Understanding
+
+## Dataset Customers
+"""
+
+customers_copy = customers.copy()
+geolocation_copy = geolocation.copy()
+order_items_copy = order_items.copy()
+order_payment_copy = order_payment.copy()
+order_reviews_copy = order_reviews.copy()
+orders_copy = orders.copy()
+products_copy = products.copy()
+sellers_copy = sellers.copy()
+product_category_name_copy = product_category_name.copy()
+
+customers_copy.info()
+
+customers_copy.describe()
+
+customers_copy.shape
+
+"""## Dataset Geolocation"""
+
+geolocation_copy.info()
+
+geolocation_copy.describe()
+
+geolocation_copy.shape
+
+"""## Dataset Order_items"""
+
+order_items_copy.info()
+
+order_items_copy.describe()
+
+"""Lakukan Q-Q plot dan uji Kolmogorov-Smirnov untuk memeriksa asumsi normalitas pada dataset order_items"""
+
+#Mengecek uji statistik untuk normalitas, yaitu Kolmogorov-Smirnov Test
+
+from scipy.stats import kstest
+
+stat, p = kstest(order_items_copy['price'], 'norm')
+print('Statistic:', stat)
+print('p-value:', p)
+
+if p > 0.05:
+    print("Data berdistribusi normal.")
+else:
+    print("Data tidak berdistribusi normal.")
+
+# atau bisa juga mengecek menggunakan q-q plot (quartile-quartile plot)
+
+stats.probplot(order_items_copy['price'], dist="norm", plot=plt)
+plt.title('Q-Q plot of price')
+plt.xlabel('theoretical quantiles')
+plt.ylabel('sample quantiles')
+
+"""Mengatasi ini agar berdistribusi normal, yaitu dengan cara transformasi data"""
+
+oit_log_data = np.log(order_items_copy['price']+1)
+stats.probplot(oit_log_data, dist="norm",plot=plt)
+plt.title('Q-Q plot setelah transformasi data')
+plt.xlabel('theoretical quantiles')
+plt.ylabel('sample quantiles')
+
+"""Grafik tersebut sudah menyebar secara normal dengan menggunakan tranformasi data. Selanjutnya, melakukan uji Kolmogorov-Smirnov untuk melihat sebaran data"""
+
+stats, pvalue = kstest(oit_log_data, "norm", args=(np.mean(oit_log_data), np.std(oit_log_data)))
+
+# Menampilkan hasil uji
+print('Berikut hasil uji Kolmogorov-Smirnov')
+print("D:", stats, "p-value:", pvalue)
+
+"""Mengecek apakah ada outlier pada kolom price di dataset order_items"""
+
+# Menggunakan metode IQR (Interquartile Range)
+#Cari dulu kuartil pertama dan kuartil ketiga
+Q1 = order_items_copy['price'].quantile(0.25)
+Q3 = order_items_copy['price'].quantile(0.75)
+#Menghitung Interquartile Range
+IQR = Q3- Q1
+# Menentukan batas atas dan batas bawah
+lower_bound = Q1 - 1.5 * IQR
+upper_bound = Q3 + 1.5 * IQR
+# Mencari outlier
+order_items_copy_ol = order_items_copy['price'][(order_items_copy['price'] >= lower_bound) & (order_items_copy['price'] <= upper_bound)]
+# Menampilkan hasil
+print(f"Jumlah outlier: {len(order_items_copy_ol)}")
+print(order_items_copy_ol)
+
+plt.figure(figsize=(8, 6))
+sns.boxplot(x=order_items_copy['price'])
+plt.title("Boxplot of Price")
+plt.xlabel('Sumbu X')
+plt.ylabel('Nilai')
+plt.show()
+
+order_items_copy.shape
+
+"""## Dataset Order_payment"""
+
+order_payment_copy.info()
+
+order_payment_copy.describe()
+
+order_payment_copy.shape
+
+"""## Order_reviews"""
+
+order_reviews_copy.info()
+
+order_reviews_copy.describe()
+
+order_reviews_copy.shape
+
+"""## Dataset Orders"""
+
+orders_copy.info()
+
+orders_copy.shape
+
+"""## Dataset Products"""
+
+products_copy.info()
+
+products_copy.describe()
+
+products_copy.shape
+
+"""## Dataset Sellers"""
+
+sellers_copy.info()
+
+sellers_copy.describe()
+
+sellers_copy.shape
+
+"""## Dataset Product_category_name"""
+
+product_category_name_copy.info()
+
+"""# Data Cleaning
+
+## Mengecek & Mengatasi Missing Value
+
+### Dataset Customers
+"""
+
+customers_copy.isna().sum()
+
+"""### Dataset Geolocation"""
+
+geolocation_copy.isna().sum()
+
+"""### Dataset Order_items"""
+
+order_items_copy.isna().sum()
+
+"""### Dataset Order_payment"""
+
+order_payment_copy.isna().sum()
+
+"""### Dataset Order_reviews"""
+
+order_reviews_copy.isna().sum()
+
+"""Berdasarkan hasil di atas terdapat missing value pada kolom review_comment_title dan reviews_comment_message. Cara Mengatasi missing value pada kedua kolom tersebut dengan mengisi "no title" untuk kolom review_comment_title dan "no message"
+"""
+
+order_reviews_copy['review_comment_title'].fillna('no_title', inplace=True)
+order_reviews_copy.head(20)
+
+order_reviews_copy['review_comment_message'].fillna('no_message', inplace=True)
+order_reviews_copy.head(20)
+
+order_reviews_copy.isna().sum()
+
+"""### Dataset Orders"""
+
+orders_copy.isna().sum()
+
+"""Berdasarkan hasil di atas terdapat missing value terdapat di kolom order_approved_at, order_delivered_carrier_date, order_delivered_customer_date. Cara mengatasi missing value tersebut adalah dengan menghapus baris yang terdapat missing value"""
+
+orders_copy.dropna(subset=['order_approved_at'], inplace=True)
+orders_copy.head(20)
+
+orders_copy.dropna(subset=['order_delivered_carrier_date'], inplace=True)
+orders_copy.head(20)
+
+orders_copy.dropna(subset=['order_delivered_customer_date'], inplace=True)
+orders_copy.head(20)
+
+orders_copy.isna().sum()
+
+orders_copy.shape
+
+"""### Dataset products"""
+
+products_copy.isna().sum()
+
+"""Berdasarkan hasil di atas terdapat missing value di semua kolom kecuali product_id. Cara mengatasi missing value tersebut, yaitu:
+
+1. kolom product_category_name yang terdapat missing value, diatasi dengan cara mengisi baris missing value dengan "no name"
+
+2. kolom product_name_lenght yang terdapat missing value, diatasi dengan cara mengambil value dibaris sebelumnya
+
+3. product_description_lenght yang terdapat missing value, diatasi dengan cara mengambil value dibaris sebelumnya
+
+4. product_photos_qty yang terdapat missing value, diatasi dengan cara mengambil value dibaris sebelumnya
+
+5. product_weight_g yang terdapat missing value, diatasi dengan cara mengambil value dibaris sebelumnya
+
+6. product_length_cm yang terdapat missing value, diatasi dengan cara mengisi value dengan rata-rata
+
+7. product_height_cm yang terdapat missing value, diatasi dengan cara mengisi value dengan rata-rata
+
+8. product_width_cm yang terdapat missing value, diatasi dengan cara mengisi value dengan rata-rata
+"""
+
+products_copy_new = products_copy[['product_id','product_category_name','product_name_lenght','product_description_lenght','product_photos_qty','product_weight_g', 'product_length_cm','product_height_cm','product_width_cm']]
+
+products_copy_new['product_category_name'].fillna('no_name', inplace=True)
+products_copy_new.head(30)
+
+products_copy_new['product_name_lenght'].fillna(method='ffill',axis=0,inplace=True)
+products_copy_new.head(20)
+
+products_copy_new['product_description_lenght'].fillna(method='ffill', axis=0, inplace=True)
+products_copy_new.head(20)
+
+products_copy_new['product_photos_qty'].fillna(method='ffill', axis=0, inplace=True)
+products_copy_new.head(20)
+
+products_copy_new['product_weight_g'].fillna(method='ffill', axis=0, inplace=True)
+products_copy_new.head(20)
+
+products_copy_new['product_width_cm'].fillna(products_copy['product_width_cm'].mean(), axis=0, inplace=True)
+products_copy_new.head(20)
+
+products_copy_new['product_height_cm'].fillna(products_copy['product_width_cm'].mean(), axis=0, inplace=True)
+products_copy_new.head(20)
+
+products_copy_new['product_length_cm'].fillna(products_copy['product_length_cm'].mean(), axis=0, inplace=True)
+products_copy_new.head(20)
+
+products_copy_new.isna().sum()
+
+"""### Dataset Sellers"""
+
+sellers_copy.isna().sum()
+
+"""### Dataset Product_category_name"""
+
+product_category_name_copy.isna().sum()
+
+"""## Mengecek Normalisasi Teks dan Mengatasi Normalisasi
+
+### Dataset Customers
+"""
+
+# Mengecek typo pada kolom customer_city dan customer_state
+pd.set_option('display.max_rows', None)
+
+# menghitung jumlah nilai yang muncul di kolom "customer_city"
+customer_city_counts = customers_copy['customer_city'].value_counts()
+
+# Mengurutkan customer_city berdasarkan alfabet
+sorted_customer_city_counts = customer_city_counts.sort_index()
+
+# Menampilkan nilai-nilai secara urut bersama dengan jumlah kali muncul
+print(sorted_customer_city_counts)
+
+customers_copy['customer_city'].value_counts()
+
+# menghitung jumlah nilai yang muncul di kolom "customer_state"
+customer_state_counts = customers_copy['customer_state'].value_counts()
+
+# Mengurutkan customer_state berdasarkan alfabet
+sorted_customer_state_counts = customer_state_counts.sort_index()
+
+# Menampilkan nilai-nilai secara urut bersama dengan jumlah kali muncul
+print(sorted_customer_state_counts)
+
+customers_copy['customer_state'].value_counts()
+
+"""Tidak terdapat inkonsistensi data pada kolom customer_city. Akan tetapi, akan dilakukan proses meratakan teks tanpa spasi di kolom tersebut"""
+
+# Mengatasi spasi menjadi _ pada kolom 'customer_city'
+customers_copy['customer_city'] = customers_copy['customer_city'].replace({' ':'_'
+}, regex=True)
+
+customers_copy.head(20)
+
+"""### Dataset Geolocation"""
+
+# Menghitung jumlah nilai yang muncul di kolom "geolocation city"
+geolocation_city_counts = geolocation_copy['geolocation_city'].value_counts()
+
+# Mengurutkan geolocationc_city berdasarkan alfabet
+sorted_geolocation_city_counts = geolocation_city_counts.sort_index()
+
+# Menampilkan nilai-nilai secara urut bersama dengan jumlah kali muncul
+print(sorted_geolocation_city_counts)
+
+# Melihat nilai unik pada kolom 'geolocation_city' pada dataset Orders
+unique_status = geolocation_copy['geolocation_city'].unique()
+print("Nilai unik pada kolom 'geolocation_city':")
+print(unique_status)
+
+# Mengatasi karakter unik pada kolom 'geolocation_city'
+geolocation_copy['geolocation_city'] = geolocation_copy['geolocation_city'].replace({
+    'á': 'a', 'é': 'e', 'è': 'e', 'ê': 'e', 'í': 'i', 'ó': 'o', 'ô': 'o', 'ö': 'o', 'ú': 'u', 'ü': 'u',
+    'û': 'u','ç': 'c', 'í': 'i', 'i': 'i', 'ã': 'a', 'õ': 'o', 'ô': 'o', 'à': 'a', 'â': 'a', ' ':'_'
+}, regex=True)
+
+# Menampilkan nilai unik lagi setelah penggantian karakter
+updated_unique_status = geolocation_copy['geolocation_city'].unique()
+print("Nilai unik setelah pembersihan:")
+print(updated_unique_status)
+
+# Menampilkan jumlah frekuensi dari setiap nilai unik setelah perubahan
+print('\nMenampilkan jumlah frekuensi dari setiap nilai unik setelah perubahan')
+print(geolocation_copy['geolocation_city'].value_counts())
+
+geolocation_copy.head(20)
+
+# Menormalisasi nilai untuk '* cidade'
+typo_cid =['* cidade']
+geolocation_copy.replace(to_replace=typo_cid,value="cidade",inplace=True)
+
+#Menormalisasi nilai untuk '...arraial do cabo'
+typo_arr=['...arraial do cabo']
+geolocation_copy.replace(to_replace=typo_arr,value="arraial do cabo",inplace=True)
+
+#Menormalisasi nilai untuk '4o. centenario', '4º centenario'
+typo_cen=['4o. centenario', '4º centenario']
+geolocation_copy.replace(to_replace=typo_cen, value="centenario", inplace=True)
+
+#Menormalisasi nilai untuk 'acaraú', 'acarau'
+typo_aca=['acaraú', 'acarau']
+geolocation_copy.replace(to_replace=typo_aca, value="acara",inplace=True)
+
+#Menormalisasi nilai untuk 'acauã' dan 'acaua'
+typo_acu=['acauã', 'acaua']
+geolocation_copy.replace(to_replace=typo_acu, value="acegua",inplace=True)
+
+#Menormalisasi nilai untuk 'linharesl'
+typo_lin=['linharesl']
+geolocation_copy.replace(to_replace=typo_lin, value="limeira do oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'itapecuru-mirim'
+typo_itape=['itapecuru-mirim']
+geolocation_copy.replace(to_replace=typo_itape, value="itapecuru mirim",inplace=True)
+
+#Menormalisasi nilai untuk 'lambari doeste' dan 'lambari d%26apos%3boeste'
+typo_lmb=['lambari doeste','lambari d%26apos%3boeste']
+geolocation_copy.replace(to_replace=typo_lmb, value="lambari d'oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'algoinha'
+typo_alg=['algoinha']
+geolocation_copy.replace(to_replace=typo_alg, value="algoinhas",inplace=True)
+
+#Menormalisasi nilai untuk 'agudos do sul' dan 'agudo'
+typo_agu=['agudos do sul', 'agudo']
+geolocation_copy.replace(to_replace=typo_agu, value="agudos",inplace=True)
+
+#Menormalisasi nilai untuk 'alcântaras' dan 'alcantaras'
+typo_alc=['alcântaras', 'alcantaras']
+geolocation_copy.replace(to_replace=typo_alc, value="alcantara",inplace=True)
+
+#Menormalisasi nilai untuk 'alianca do tocantins', 'aliança do tocantins', dan 'aliança'
+typo_ali=['alianca do tocantins', 'aliança do tocantins','aliança']
+geolocation_copy.replace(to_replace=typo_ali, value="alianca",inplace=True)
+
+#Menormalisasi nilai untuk 'almirante tamandare do sul', 'almirante tamandaré', dan 'almirante tamandaré do sul '
+typo_alm=['almirante tamandare do sul', 'almirante tamandaré','almirante tamandaré do sul ']
+geolocation_copy.replace(to_replace=typo_alm, value="almirante tamandare",inplace=True)
+
+#Menormalisasi nilai untuk 'alta floresta d\'oeste', 'alta floresta do oeste', dan 'alta floresta doestel'
+typo_alt=['alta floresta d\'oeste', 'alta floresta do oeste','alta floresta doestel']
+geolocation_copy.replace(to_replace=typo_alt, value="alta floresta",inplace=True)
+
+#Menormalisasi nilai untuk 'itabatan (mucuri)'
+typo_ita=['itabatan (mucuri)']
+geolocation_copy.replace(to_replace=typo_ita, value="itabatan",inplace=True)
+
+#Menormalisasi nilai untuk 'herval doeste','herval d\' oeste', dan 'herval d oeste'
+typo_her=['herval doeste','herval d\' oeste','herval d oeste']
+geolocation_copy.replace(to_replace=typo_her, value="herval d'oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'guarulhos-sp'
+typo_gua=['guarulhos-sp']
+geolocation_copy.replace(to_replace=typo_gua, value="guarulhos",inplace=True)
+
+#Menormalisasi nilai untuk 'bacaxa (saquarema) - distrito'
+typo_bac=['bacaxa (saquarema) - distrito']
+geolocation_copy.replace(to_replace=typo_bac, value="baca",inplace=True)
+
+#Menormalisasi nilai untuk 'bandeirantes d\'oeste'
+typo_band=['bandeirantes d\'oeste']
+geolocation_copy.replace(to_replace=typo_band, value="bandeirantes d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'california da barra (barra do pirai)'
+typo_cali=['california da barra (barra do pirai)']
+geolocation_copy.replace(to_replace=typo_cali, value="california da barra",inplace=True)
+
+#Menormalisasi nilai untuk 'campo alegre de lourdes, bahia, brasil'
+typo_cam=['campo alegre de lourdes, bahia, brasil']
+geolocation_copy.replace(to_replace=typo_cam, value="campo alegre de lourdes",inplace=True)
+
+#Menormalisasi nilai untuk 'conquista d\'oeste'
+typo_con=['conquista d\'oeste']
+geolocation_copy.replace(to_replace=typo_con, value="conquista d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'figueiropolis d\'oeste' dan 'figueiropolis doeste'
+typo_fig=['figueiropolis d\'oeste' ,'figueiropolis doeste']
+geolocation_copy.replace(to_replace=typo_fig, value="figueiropolis d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'florian&oacute;polis'
+typo_flo=['florian&oacute;polis']
+geolocation_copy.replace(to_replace=typo_flo, value="floriano",inplace=True)
+
+#Menormalisasi nilai untuk 'governador dix-sept rosado'
+typo_gov=['governador dix-sept rosado']
+geolocation_copy.replace(to_replace=typo_gov, value="governador dix sept rosado",inplace=True)
+
+#Menormalisasi nilai untuk 'guajara-mirim'
+typo_guaj=['guajara-mirim']
+geolocation_copy.replace(to_replace=typo_guaj, value="guajara mirim",inplace=True)
+
+#Menormalisasi nilai untuk 'guarani d\'oeste'
+typo_guar=['guarani d\'oeste']
+geolocation_copy.replace(to_replace=typo_guar, value="guarani d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'herval d\' oeste', 'herval d\'oeste', dan 'herval doeste'
+typo_herv=['herval d\' oeste', 'herval d\'oeste', 'herval doeste']
+geolocation_copy.replace(to_replace=typo_herv, value="herval d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'igarapé-miri'
+typo_iga=['igarapé-miri']
+geolocation_copy.replace(to_replace=typo_iga, value="igarape miri",inplace=True)
+
+#Menormalisasi nilai untuk 'igarape-acu'
+typo_igaacu=['igarape-acu']
+geolocation_copy.replace(to_replace=typo_igaacu, value="igarape acu",inplace=True)
+
+#Menormalisasi nilai untuk 'itabatan (mucuri)'
+typo_itab=['itabatan (mucuri)']
+geolocation_copy.replace(to_replace=typo_itab, value="itabatan",inplace=True)
+
+#Menormalisasi nilai untuk 'itapecuru-mirim '
+typo_itapm=['itapecuru-mirim ']
+geolocation_copy.replace(to_replace=typo_itapm, value="itapecuru mirim",inplace=True)
+
+#Menormalisasi nilai untuk 'itapejara d\'oeste'
+typo_itapj=['itapejara d\'oeste']
+geolocation_copy.replace(to_replace=typo_itapj, value="itapejara d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'jacare (cabreuva)'
+typo_jaca=['jacare (cabreuva)']
+geolocation_copy.replace(to_replace=typo_jaca, value="jacare",inplace=True)
+
+#Menormalisasi nilai untuk 'monte gordo (camacari) - distrito'
+typo_mon=['monte gordo (camacari) - distrito']
+geolocation_copy.replace(to_replace=typo_mon, value="monte gordo",inplace=True)
+
+#Menormalisasi nilai untuk 'nova brasilandia d\'oeste', 'nova brasilandia doeste', dan 'nova brasilândia d\'oeste '
+typo_nov=['nova brasilandia d\'oeste', 'nova brasilandia doeste', 'nova brasilândia d\'oeste ']
+geolocation_copy.replace(to_replace=typo_nov, value="nova brasilandia d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'palmeira d\'oeste'
+typo_palm=['palmeira d\'oeste']
+geolocation_copy.replace(to_replace=typo_palm, value="palmeira d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'perola d\'oeste', dan 'perola doeste'
+typo_per=['perola d\'oeste','perola doeste']
+geolocation_copy.replace(to_replace=typo_per, value="perola d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'penedo (itatiaia)'
+typo_pen=['penedo (itatiaia)']
+geolocation_copy.replace(to_replace=typo_pen, value="penedo",inplace=True)
+
+#Menormalisasi nilai untuk 'praia grande (fundão) - distrito)'
+typo_pra=['praia grande (fundão) - distrito)']
+geolocation_copy.replace(to_replace=typo_pra, value="praia grande",inplace=True)
+
+#Menormalisasi nilai untuk 'rancho alegre d  oeste' dan 'rancho alegre d\'oeste '
+typo_ran=['rancho alegre d  oeste', 'rancho alegre d\'oeste ']
+geolocation_copy.replace(to_replace=typo_ran, value="rancho alegre d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'realeza (manhuacu)'
+typo_rea=['realeza (manhuacu)']
+geolocation_copy.replace(to_replace=typo_rea, value="realeza",inplace=True)
+
+#Menormalisasi nilai untuk 'santa barbara d\'oeste '
+typo_san=['santa barbara d\'oeste ']
+geolocation_copy.replace(to_replace=typo_san, value="santa barbara d oeste",inplace=True)
+
+#Menormalisasi nilai untuk 'são joão do pau d%26apos%3balho'
+typo_sao=['são joão do pau d%26apos%3balho']
+geolocation_copy.replace(to_replace=typo_sao, value="são joão do pau",inplace=True)
+
+#Menormalisasi nilai untuk 'tamoios (cabo frio)'
+typo_tamo=['tamoios (cabo frio)']
+geolocation_copy.replace(to_replace=typo_tamo, value="tamoios",inplace=True)
+
+#Menormalisasi nilai untuk 'vitorinos - alto rio doce' dan 'vitorinos'
+typo_vit=['vitorinos - alto rio doce', 'vitorinos']
+geolocation_copy.replace(to_replace=typo_vit, value="vitorino",inplace=True)
+
+#Menormalisasi nilai untuk 'xangri-lá' dan 'xangri-la'
+typo_xang=['xangri-lá', 'xangri-la']
+geolocation_copy.replace(to_replace=typo_xang, value="xangrila",inplace=True)
+
+geolocation_copy['geolocation_city'].value_counts()
+
+geolocation_copy.head(20)
+
+"""### Dataset Order_items"""
+
+order_items_copy_new = order_items_copy[['order_id', 'order_item_id','product_id','seller_id','shipping_limit_date','price','freight_value']]
+
+# Mengecek apakah pada kolom shipping_limit_date terdapat inkonsistensi data
+order_items_copy_new['shipping_limit_date'].value_counts()
+
+"""Tidak terdapat inkonsistensi data
+
+### Dataset Order_payment
+"""
+
+order_payment_copy_new = order_payment_copy[['order_id',	'payment_sequential',	'payment_type',	'payment_installments',	'payment_value']]
+
+#Mengecek apakah pada kolom payment_type terdapat inkonsistensi data
+order_payment_copy_new['payment_type'].value_counts()
+
+"""Tidak terdapat inkonsistensi data
+
+### Dataset Order_reviews
+"""
+
+order_reviews_copy_new = order_reviews_copy[['review_id','order_id','review_score','review_comment_title','review_comment_message','review_creation_date', 'review_answer_timestamp']]
+
+# Menghitung jumlah kemunculan setiap nilai di kolom review_comment_title
+order_reviews_counts = order_reviews_copy_new['review_comment_title'].value_counts()
+
+# Mengurutkan review_comment_title berdasarkan alphabet
+sorted_order_reviews_counts = order_reviews_counts.sort_index()
+
+# Menampilkan nilai-nilai yang diurutkan beserta jumlah kemunculannya
+print(sorted_order_reviews_counts)
+
+# Melihat nilai unik pada kolom review_comment_title pada dataset Order_reviews
+unique_status = order_reviews_copy_new['review_comment_title'].unique()
+print("Nilai unik pada kolom 'review_comment_title':")
+print(unique_status)
+
+# Mengatasi karakter unik pada kolom review_comment_title
+order_reviews_copy_new['review_comment_title'] = order_reviews_copy_new['review_comment_title'].replace({
+    'á': 'a', 'é': 'e', 'è': 'e', 'ê': 'e', 'í': 'i', 'ó': 'o', 'ô': 'o', 'ö': 'o', 'ú': 'u', 'ü': 'u',
+    'ç': 'c', 'í': 'i', 'i': 'i', 'ã': 'a', 'õ': 'o', 'ô': 'o', 'à': 'a', 'ã': 'a', ' ':'_'
+}, regex=True)
+
+order_reviews_copy_new['review_comment_title'].str.lower()
+
+order_reviews_copy_new.head()
+
+# Menghitung jumlah kemunculan setiap nilai di kolom review_comment_message
+order_reviews_counts_message = order_reviews_copy_new['review_comment_message'].value_counts()
+
+# Mengurutkan review_comment_message berdasarkan alphabet
+sorted_order_reviews_counts_message = order_reviews_counts_message.sort_index()
+
+# Menampilkan nilai-nilai yang diurutkan beserta jumlah kemunculannya
+print(sorted_order_reviews_counts_message)
+
+# Melihat nilai unik pada kolom review_comment_message pada dataset Orders
+unique_status = order_reviews_copy_new['review_comment_message'].unique()
+print("Nilai unik pada kolom 'review_comment_message':")
+print(unique_status)
+
+# Mengatasi karakter unik pada kolom review_comment_title
+order_reviews_copy_new['review_comment_message'] = order_reviews_copy_new['review_comment_message'].replace({
+    'á': 'a', 'é': 'e', 'è': 'e', 'ê': 'e', 'í': 'i', 'ó': 'o', 'ô': 'o', 'ö': 'o', 'ú': 'u', 'ü': 'u',
+    'ç': 'c', 'í': 'i', 'i': 'i', 'ã': 'a', 'õ': 'o', 'ô': 'o', 'à': 'a', 'ã': 'a', ' ':'_'
+}, regex=True)
+
+order_reviews_copy_new.head()
+
+order_reviews_copy_new['review_comment_message'].str.lower()
+
+"""### Dataset Orders"""
+
+orders_copy_new = orders_copy[['order_id','customer_id','order_status','order_purchase_timestamp','order_approved_at','order_delivered_carrier_date', 'order_delivered_customer_date','order_estimated_delivery_date']]
+
+# Menghitung jumlah kemunculan setiap nilai di kolom 'order_status'
+order_status_counts = orders_copy_new['order_status'].value_counts()
+
+# Mengurutkan hasil dari A-Z
+sorted_order_status = order_status_counts.sort_index()
+
+# Menampilkan nilai-nilai yang diurutkan beserta jumlah kemunculannya
+print(sorted_order_status)
+
+# Menghitung jumlah kemunculan setiap nilai di kolom 'order_purchase_timestamp'
+order_purchase_timestamp_counts = orders_copy_new['order_purchase_timestamp'].value_counts()
+
+# Mengurutkan hasil dari A-Z
+sorted_order_purchase_timestamp = order_purchase_timestamp_counts.sort_index()
+
+# Menampilkan nilai-nilai yang diurutkan beserta jumlah kemunculannya
+print(sorted_order_purchase_timestamp)
+
+"""Tidak terdapat inkonsistensi data
+
+### Dataset Products
+"""
+
+# Normalisasi teks
+products_copy_new['product_category_name'] = products_copy_new['product_category_name'].str.lower().str.strip()
+
+# Periksa kategori unik
+unique_categories = products_copy_new['product_category_name'].unique()
+print("Kategori unik dalam product_category_name:")
+print(unique_categories)
+
+# Baca file kategori resmi
+category_translation = pd.read_csv('/content/gdrive/MyDrive/MSIB #7/CAPSTONE PROJECT/DATA SET/product_category_name_translation.csv')
+
+# Tampilkan daftar kategori resmi
+print("Kategori resmi dalam dataset:")
+print(category_translation['product_category_name_english'].unique())
+
+# Buat mapping dictionary
+mapping_dict = dict(zip(
+    category_translation['product_category_name'],
+    category_translation['product_category_name_english']
+))
+
+# Terapkan mapping ke kolom product_category_name pada dataset products_copy
+products_copy_new['product_category_name'] = products_copy_new['product_category_name'].replace(mapping_dict)
+
+# Periksa kategori unik setelah mapping
+unique_categories_after_mapping = products_copy_new['product_category_name'].unique()
+print("Kategori unik setelah mapping:")
+print(unique_categories_after_mapping)
+
+products_copy_new.head(20)
+
+"""### Dataset Sellers"""
+
+# Menghitung jumlah kemunculan setiap nilai di kolom 'seller_city'
+seller_city_counts = sellers_copy['seller_city'].value_counts()
+
+# Mengurutkan hasil dari A-Z
+sorted_seller_city = seller_city_counts.sort_index()
+
+# Menampilkan nilai-nilai yang diurutkan beserta jumlah kemunculannya
+print(sorted_seller_city)
+
+# Mengatasi normalisasi teks '04482255'
+typos_kos=['04482255']
+sellers_copy.replace(to_replace=typos_kos,value="americana",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'andira-pr'
+typos_and=['andira-pr']
+sellers_copy.replace(to_replace=typos_and,value="andira pr",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'angra dos reis rj'
+typos_ang=['angra dos reis rj']
+sellers_copy.replace(to_replace=typos_ang,value="angra dos reis",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'arraial d\'ajuda (porto seguro)'
+typos_arra=['arraial d\'ajuda (porto seguro)']
+sellers_copy.replace(to_replace=typos_arra,value="arraial d ajuda",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'auriflama/sp'
+typos_aur=['auriflama/sp']
+sellers_copy.replace(to_replace=typos_aur,value="auriflama",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'balenario camboriu' dan 'balnario camboriu'
+typos_bal=['balenario camboriu', 'balnario camboriu']
+sellers_copy.replace(to_replace=typos_bal,value="balneario camboriu",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'barbacena/ minas gerais'
+typos_barb=['barbacena/ minas gerais']
+sellers_copy.replace(to_replace=typos_barb,value="barbacena",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'belo horizont'
+typos_belo=['belo horizont']
+sellers_copy.replace(to_replace=typos_belo,value="belo horizonte",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'brasilia df'
+typos_bras=['brasilia df']
+sellers_copy.replace(to_replace=typos_bras,value="brasilia",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'carapicuiba / sao paulo'
+typos_cara=['carapicuiba / sao paulo']
+sellers_copy.replace(to_replace=typos_cara,value="carapicuiba",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'cariacica / es'
+typos_cari=['cariacica / es']
+sellers_copy.replace(to_replace=typos_cari,value="cariacica",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'cascavael'
+typos_cas=['cascavael']
+sellers_copy.replace(to_replace=typos_cas,value="cascavel",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'curitibanos'
+typos_cur=['curitibanos']
+sellers_copy.replace(to_replace=typos_cur,value="curitibanos",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'floranopolis'
+typos_flo=['floranopolis']
+sellers_copy.replace(to_replace=typos_flo,value="florianopolis",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'jacarei / sao paulo'
+typos_jac=['jacarei / sao paulo']
+sellers_copy.replace(to_replace=typos_jac,value="jacarei",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'jaguaruna'
+typos_jag=['jaguaruna']
+sellers_copy.replace(to_replace=typos_jag,value="jaguariuna",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'lages - sc'
+typos_lag=['lages - sc']
+sellers_copy.replace(to_replace=typos_lag,value="lages",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'maua/sao paulo'
+typos_mau=['maua/sao paulo']
+sellers_copy.replace(to_replace=typos_mau,value="maua",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'mogi das cruzes / sp' dan 'mogi das cruses'
+typos_mog=['mogi das cruzes / sp', 'mogi das cruses']
+sellers_copy.replace(to_replace=typos_mog,value="mogi das cruzes",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'novo hamburgo, rio grande do sul, brasil'
+typos_rio=['novo hamburgo, rio grande do sul, brasil']
+sellers_copy.replace(to_replace=typos_rio,value="novo hamburgo",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'pinhais/pr'
+typos_pin=['pinhais/pr']
+sellers_copy.replace(to_replace=typos_pin,value="pinhais",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'ribeirao preto / sao paulo'
+typos_rib=['ribeirao preto / sao paulo']
+sellers_copy.replace(to_replace=typos_rib,value="ribeirao preto",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'rio de janeiro \rio de janeiro'
+typos_rios=['rio de janeiro \rio de janeiro']
+sellers_copy.replace(to_replace=typos_rios,value="rio de janeiro",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'rio de janeiro / rio de janeiro', 'rio de janeiro \rio de janeiro', 'rio de janeiro, rio de janeiro, brasil', dan 'rio de janeiro \rio de janeiro'
+typos_jane=['rio de janeiro / rio de janeiro','rio de janeiro \rio de janeiro','rio de janeiro, rio de janeiro, brasil', 'rio de janeiro \rio de janeiro']
+sellers_copy.replace(to_replace=typos_jane,value="rio de janeiro",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'santa barbara d\'oeste' dan 'santa barbara d´oeste'
+typos_san=['santa barbara d\'oeste', 'santa barbara d´oeste']
+sellers_copy.replace(to_replace=typos_san,value="santa barbara d oeste",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'santo andre/sao paulo'
+typos_san=['santo andre/sao paulo']
+sellers_copy.replace(to_replace=typos_san,value="santo andre",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks
+typos_sao=['sao  paulo', 'sao paluo', 'sao paulo - sp', 'sao paulo / sao paulo', 'sao paulo sp', 'sao paulop', 'sao pauo', 'são paulo']
+sellers_copy.replace(to_replace=typos_sao,value="sao paulo",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'sao  jose dos pinhais' dan 'sao jose dos pinhas'
+typos_jose=['sao  jose dos pinhais', 'sao jose dos pinhas']
+sellers_copy.replace(to_replace=typos_jose,value="sao jose dos pinhais",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'sao jose do rio pret'
+typos_joss=['sao jose do rio pret']
+sellers_copy.replace(to_replace=typos_joss,value="sao jose do rio preto",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'sao miguel d\'oeste' dan 'sao miguel do oeste'
+typos_migu=['sao miguel d\'oeste', 'sao miguel do oeste']
+sellers_copy.replace(to_replace=typos_migu,value="sao miguel d oeste",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'sao sebastiao da grama/sp'
+typos_sebas=['sao sebastiao da grama/sp']
+sellers_copy.replace(to_replace=typos_sebas,value="sao sebastiao",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'sbc/sp'
+typos_sbc=['sbc/sp']
+sellers_copy.replace(to_replace=typos_sbc,value="sbc",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'sp / sp'
+typos_sp=['sp / sp']
+sellers_copy.replace(to_replace=typos_sp,value="sp",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'tabao da serra'
+typos_tabo=['tabao da serra']
+sellers_copy.replace(to_replace=typos_tabo,value="taboao da serra",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'vendas@creditparts.com.br'
+typos_ver=['vendas@creditparts.com.br']
+sellers_copy.replace(to_replace=typos_ver,value="vera cruz",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks ''sp / sp'
+typos_sp=['sp / sp']
+sellers_copy.replace(to_replace=typos_sp,value="sp / sp",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi normalisasi teks 'sp / sp'
+typos_sp=['sp / sp']
+sellers_copy.replace(to_replace=typos_sp,value="sp / sp",inplace=True)
+sellers_copy['seller_city'].value_counts()
+
+# Mengatasi spasi menjadi _ pada kolom 'seller_city'
+sellers_copy['seller_city'] = sellers_copy['seller_city'].replace({' ':'_'
+}, regex=True)
+
+sellers_copy.head()
+
+"""## Mengecek Duplikasi duplikasi
+
+### Dataset Customers
+"""
+
+customers_copy['customer_id'].duplicated().sum()
+
+customers_copy[customers_copy['customer_id'].duplicated()]
+
+customers_copy['customer_unique_id'].duplicated().sum()
+
+customers_copy[customers_copy['customer_unique_id'].duplicated()]
+
+customers_copy['customer_unique_id'].value_counts()
+
+"""Berdasarkan hasil di atas terdapat duplikasi data pada kolom customer_unique_id sehingga kita perlu mengatasi hal tersebut dengan cara menghilangkan data duplikasi dan menyisakan satu data saja"""
+
+customers_copy.drop_duplicates(subset=['customer_unique_id'], inplace=True)
+customers_copy['customer_unique_id'].duplicated().sum()
+
+customers_copy.shape
+
+"""### Dataset Geolocation"""
+
+geolocation_copy[geolocation_copy['geolocation_zip_code_prefix'].duplicated()]
+
+freq = geolocation_copy['geolocation_zip_code_prefix'].value_counts()
+print(freq.head(10))
+
+dup_details = geolocation_copy[geolocation_copy.duplicated(subset=['geolocation_zip_code_prefix', 'geolocation_lat', 'geolocation_lng'], keep=False)]
+print(dup_details)
+
+geolocation_copy['geolocation_zip_code_prefix'].duplicated().sum()
+
+geolocation_copy['geolocation_zip_code_prefix'].value_counts()
+
+"""Berdasarkan hasil di atas terdapat duplikasi data pada kolom geolocation_zip_code_prefix sehingga kita perlu mengatasi hal tersebut dengan cara menghilangkan data duplikasi dan menyisakan satu data saja"""
+
+geolocation_copy.drop_duplicates(subset=['geolocation_zip_code_prefix'], inplace=True)
+geolocation_copy['geolocation_zip_code_prefix'].duplicated().sum()
+
+geolocation_copy.shape
+
+"""### Dataset Order_items"""
+
+order_items_copy_new['order_id'].duplicated().sum()
+
+order_items_copy_new['order_id'].value_counts()
+
+order_items_copy_new['product_id'].duplicated().sum()
+
+order_items_copy_new['seller_id'].duplicated().sum()
+
+"""### Dataset Order_payment"""
+
+order_payment_copy_new['order_id'].duplicated().sum()
+
+order_payment_copy_new['order_id'].value_counts()
+
+"""### Dataset Order_reviews"""
+
+order_reviews_copy_new['order_id'].duplicated().sum()
+
+order_reviews_copy_new['review_id'].duplicated().sum()
+
+"""### Dataset Orders"""
+
+orders_copy_new['order_id'].duplicated().sum()
+
+orders_copy_new['customer_id'].duplicated().sum()
+
+"""### Dataset Products"""
+
+products_copy_new['product_id'].duplicated().sum()
+
+"""### Dataset Sellers"""
+
+sellers_copy['seller_id'].duplicated().sum()
+
+"""### Dataset Product_category_name"""
+
+product_category_name_copy['product_category_name'].duplicated().sum()
+
+"""## Mengubah tipe data
+
+### Dataset customers
+"""
+
+customers_copy.dtypes
+
+"""Tidak perlu diubah karena sudah sesuai
+
+### Dataset geolocation
+"""
+
+geolocation_copy.dtypes
+
+"""Tidak perlu diubah karena sudah sesuai
+
+### Dataset Order_items
+"""
+
+order_items_copy_new.dtypes
+
+"""Tidak perlu diubah karena sudah sesuai
+
+### Dataset order_payment
+"""
+
+order_payment_copy_new.dtypes
+
+"""Tidak perlu diubah karena sudah sesuai
+
+### Dataset order_reviews
+"""
+
+order_reviews_copy_new.dtypes
+
+"""Tidak perlu diubah karena sudah sesuai
+
+### Dataset orders
+"""
+
+orders_copy_new.dtypes
+
+"""Perlu diubah tipe data pada kolom order_purchase_timestamp, order_approved_at, order_delivered_carrier_date, order_delivered_customer_date, order_estimated_delivery_date"""
+
+orders_copy_new['order_purchase_timestamp'] = pd.to_datetime(orders_copy_new['order_purchase_timestamp'])
+orders_copy_new['order_approved_at'] = pd.to_datetime(orders_copy_new['order_approved_at'])
+orders_copy_new['order_delivered_customer_date'] = pd.to_datetime(orders_copy_new['order_delivered_customer_date'])
+orders_copy_new['order_estimated_delivery_date'] = pd.to_datetime(orders_copy_new['order_estimated_delivery_date'])
+
+orders_copy_new.dtypes
+
+"""### Dataset products"""
+
+products_copy_new.dtypes
+
+"""Tidak perlu diubah karena sudah sesuai
+
+### Dataset sellers
+"""
+
+sellers_copy.dtypes
+
+"""Tidak perlu diubah karena sudah sesuai
+
+# Pengecekan
+"""
+
+customers_copy.head(20)
+
+geolocation_copy.head(20)
+
+order_items_copy_new.head(20)
+
+order_payment_copy_new.head(20)
+
+order_reviews_copy_new.head(20)
+
+orders_copy_new.head(20)
+
+products_copy_new.head(20)
+
+sellers_copy.head(20)
+
+"""# Menyimpan hasil data cleaning
+
+### Dataset Customers
+"""
+
+customers_copy.to_csv('customers_cleaned.csv')
+
+from google.colab import files
+files.download('customers_cleaned.csv')
+
+"""### Dataset Geolocation"""
+
+geolocation_copy.to_csv('geolocatio_claened.csv')
+
+from google.colab import files
+files.download('geolocatio_claened.csv')
+
+"""### Dataset Order_items"""
+
+order_items_copy_new.to_csv('order_items_cleaned.csv')
+
+from google.colab import files
+files.download('order_items_cleaned.csv')
+
+"""### Dataset Order_payment"""
+
+order_payment_copy_new.to_csv('order_payment_cleaned.csv')
+
+from google.colab import files
+files.download('order_payment_cleaned.csv')
+
+"""### Dataset Order_reviews"""
+
+order_reviews_copy_new.to_csv('order_reviews_cleaned.csv')
+
+from google.colab import files
+files.download('order_reviews_cleaned.csv')
+
+"""### Dataset Orders"""
+
+orders_copy_new.to_csv('orders_cleaned.csv')
+
+from google.colab import files
+files.download('orders_cleaned.csv')
+
+"""### Dataset Products"""
+
+products_copy_new.to_csv('products_cleaned.csv')
+
+from google.colab import files
+files.download('products_cleaned.csv')
+
+"""### Dataset sellers"""
+
+sellers_copy.to_csv('sellers_cleaned.csv')
+
+from google.colab import files
+files.download('sellers_cleaned.csv')
+
+"""# Exploratory Data Analysis
+
+##1. Data Penjualan per Bulan
+"""
+
+# 1. Monthly Sales Data
+data = pd.merge(order_items, orders, on='order_id', how='inner')
+data = pd.merge(data, order_payment, on='order_id', how='left')
+data['order_purchase_timestamp'] = pd.to_datetime(data['order_purchase_timestamp'])
+data['month'] = data['order_purchase_timestamp'].dt.to_period('M')
+
+sales_per_month = data.groupby('month')['price'].sum().reset_index()
+sales_per_month.rename(columns={'price': 'total_sales'}, inplace=True)
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+plt.figure(figsize=(12, 6))
+sns.lineplot(data=sales_per_month, x='month', y='total_sales', marker='o')
+plt.title('Total Sales per Month')
+plt.xlabel('Month')
+plt.ylabel('Total Sales')
+plt.xticks(rotation=45)
+plt.grid(True)
+plt.show()
+
+"""## 2. Jumlah Pembeli Tiap Bulan"""
+
+# Menggabungkan orders dengan customers
+data = pd.merge(orders, customers, on='customer_id', how='inner')
+data['order_purchase_timestamp'] = pd.to_datetime(data['order_purchase_timestamp'])
+data['month'] = data['order_purchase_timestamp'].dt.to_period('M')
+buyers_per_month = data.groupby('month')['customer_id'].nunique().reset_index()
+buyers_per_month.rename(columns={'customer_id': 'total_buyers'}, inplace=True)
+
+import plotly.express as px
+
+# Membuat dashboard interaktif
+fig = px.bar(
+    buyers_per_month,
+    x='month',
+    y='total_buyers',
+    title='Jumlah Pembeli Tiap Bulan',
+    labels={'month': 'Bulan', 'total_buyers': 'Jumlah Pembeli'},
+    text='total_buyers'
+)
+
+fig.update_traces(texttemplate='%{text:.0f}', textposition='outside')
+fig.update_layout(
+    xaxis=dict(title='Bulan'),
+    yaxis=dict(title='Jumlah Pembeli'),
+    template='plotly_white',
+    title_x=0.5
+)
+fig.show()
+
+"""## 3. Persebaran Penjualan Setiap Kota"""
+
+data = pd.merge(order_items, orders, on='order_id', how='inner')
+data = pd.merge(data, geolocation, left_on='seller_id', right_on='geolocation_seller_id', how='left')
+sales_per_city = data.groupby('geolocation_city')['price'].sum().reset_index()
+sales_per_city.rename(columns={'price': 'total_sales'}, inplace=True)
+
+"""## 4. Proporsi Kategori Barang Yang Terjual"""
+
+# Gabungkan order_items dengan products
+data = pd.merge(order_items, products, on='product_id', how='inner')
+# Hitung jumlah barang terjual per kategori
+category_sales = data.groupby('product_category_name')['order_item_id'].count().reset_index()
+category_sales.rename(columns={'order_item_id': 'total_sales'}, inplace=True)
+
+# Hitung proporsi
+category_sales['proportion'] = category_sales['total_sales'] / category_sales['total_sales'].sum() * 100
+
+import plotly.express as px
+
+fig = px.pie(
+    category_sales,
+    names='product_category_name',
+    values='total_sales',
+    title='Proporsi Kategori Barang yang Terjual',
+    labels={'product_category_name': 'Kategori', 'total_sales': 'Total Penjualan'},
+    hole=0.4  # Membuat donat chart
+)
+
+fig.update_traces(textinfo='percent+label')
+fig.update_layout(title_x=0.5)
+fig.show()
+
+fig = px.bar(
+    category_sales.sort_values('total_sales', ascending=False),
+    x='product_category_name',
+    y='total_sales',
+    title='Jumlah Penjualan per Kategori',
+    labels={'product_category_name': 'Kategori', 'total_sales': 'Total Penjualan'},
+    text='total_sales'
+)
+
+fig.update_traces(texttemplate='%{text:.0f}', textposition='outside')
+fig.update_layout(
+    xaxis=dict(title='Kategori', tickangle=45),
+    yaxis=dict(title='Total Penjualan'),
+    template='plotly_white',
+    title_x=0.5
+)
+fig.show()
+
+"""## 5. Jumlah Seller Setiap Kota
+
+"""
+
+# Gabungkan sellers dengan geolocation berdasarkan zip_code_prefix
+seller_location = pd.merge(
+    sellers,
+    geolocation,
+    left_on='seller_zip_code_prefix',
+    right_on='geolocation_zip_code_prefix',
+    how='inner'
+)# Hitung jumlah seller per kota
+sellers_per_city = seller_location.groupby('geolocation_city')['seller_id'].nunique().reset_index()
+sellers_per_city.rename(columns={'seller_id': 'total_sellers'}, inplace=True)
+
+import plotly.express as px
+
+fig = px.bar(
+    sellers_per_city.sort_values('total_sellers', ascending=False).head(20),
+    x='geolocation_city',
+    y='total_sellers',
+    title='Jumlah Seller per Kota (Top 20)',
+    labels={'geolocation_city': 'Kota', 'total_sellers': 'Jumlah Seller'},
+    text='total_sellers'
+)
+
+fig.update_traces(texttemplate='%{text:.0f}', textposition='outside')
+fig.update_layout(
+    xaxis=dict(title='Kota', tickangle=45),
+    yaxis=dict(title='Jumlah Seller'),
+    template='plotly_white',
+    title_x=0.5
+)
+fig.show()
+
+# Hitung rata-rata koordinat per kota
+geo_avg = seller_location.groupby('geolocation_city')[['geolocation_lat', 'geolocation_lng']].mean().reset_index()
+city_sellers_geo = pd.merge(sellers_per_city, geo_avg, on='geolocation_city', how='inner')
+
+# Visualisasi dengan scatter geo
+fig = px.scatter_geo(
+    city_sellers_geo,
+    lat='geolocation_lat',
+    lon='geolocation_lng',
+    size='total_sellers',
+    text='geolocation_city',
+    title='Persebaran Seller per Kota',
+    labels={'geolocation_city': 'Kota', 'total_sellers': 'Jumlah Seller'},
+    projection='natural earth'
+)
+
+fig.update_layout(
+    title_x=0.5,
+    template='plotly_white'
+)
+fig.show()
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Menyimpan data gabungan ke file CSV
+final_dataset.to_csv('/content/gdrive/MyDrive/CAKAP STUPEN/final_dataset.csv', index=False)
+
